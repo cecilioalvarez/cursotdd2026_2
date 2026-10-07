@@ -1,0 +1,163 @@
+MOCKITO - ARGUMENT MATCHERS
+===========================
+
+Los argument matchers permiten indicar en when(...) y verify(...) que
+argumentos aceptamos sin tener que poner un valor exacto.
+
+Los ejemplos usan las clases del proyecto:
+
+    ServicioValidacionFacturas validacion = mock(ServicioValidacionFacturas.class);
+    ServicioFacturaRegistro registro = mock(ServicioFacturaRegistro.class);
+    Factura f = new Factura(1, "informatica", 200);
+
+Imports necesarios:
+
+    import static org.mockito.ArgumentMatchers.*;
+    import static org.mockito.AdditionalMatchers.*;   // solo para gt, lt, and, or, not...
+    import static org.mockito.Mockito.*;
+
+
+REGLA IMPORTANTE
+----------------
+Si un argumento usa un matcher, TODOS los argumentos de esa llamada deben
+usar matchers. Para los valores fijos se usa eq(...).
+
+    when(validacion.esValida(anyString(), 200));           // MAL -> InvalidUseOfMatchersException
+    when(validacion.esValida(anyString(), eq(200.0)));     // BIEN
+
+
+1. MATCHERS GENERICOS
+---------------------
+
+any()
+    Cualquier valor, incluido null.
+
+        verify(registro).registrar(any());
+
+any(Clase.class)
+    Cualquier objeto de ese tipo. No acepta null.
+
+        verify(registro).registrar(any(Factura.class));
+
+isA(Clase.class)
+    El argumento es una instancia de esa clase (o de una subclase).
+
+        verify(registro).registrar(isA(Factura.class));
+
+
+2. MATCHERS POR TIPO
+--------------------
+
+anyString(), anyInt(), anyLong(), anyDouble(), anyBoolean(), anyChar()...
+    Cualquier valor de ese tipo. anyString() NO acepta null.
+
+        when(validacion.esValida(anyString(), anyDouble())).thenReturn(true);
+
+anyList(), anySet(), anyMap(), anyCollection(), anyIterable()
+    Cualquier coleccion de ese tipo (no null).
+
+        // con un metodo como registrarTodas(List<Factura> facturas)
+        verify(registro).registrarTodas(anyList());
+
+
+3. IGUALDAD E IDENTIDAD
+-----------------------
+
+eq(valor)
+    Igual al valor (usa equals). Se necesita para mezclar con otros matchers.
+
+        when(validacion.esValida(eq("informatica"), anyDouble())).thenReturn(true);
+
+same(objeto)
+    Exactamente el mismo objeto en memoria (==).
+
+        verify(registro).registrar(same(f));
+
+refEq(objeto)
+    Compara campo a campo por reflexion. Util cuando la clase no tiene
+    equals(), como nuestra Factura.
+
+        verify(registro).registrar(refEq(new Factura(1, "informatica", 200)));
+
+
+4. NULOS
+--------
+
+isNull()
+    El argumento es null.
+
+        when(validacion.esValida(isNull(), anyDouble())).thenReturn(false);
+
+notNull() / isNotNull()
+    El argumento no es null.
+
+        verify(registro).registrar(notNull());
+
+nullable(Clase.class)
+    null o una instancia de ese tipo.
+
+        when(validacion.esValida(nullable(String.class), anyDouble())).thenReturn(false);
+
+
+5. CADENAS
+----------
+
+startsWith("..."), endsWith("..."), contains("..."), matches("regex")
+
+        when(validacion.esValida(startsWith("info"), anyDouble())).thenReturn(true);
+        when(validacion.esValida(endsWith("ing"), anyDouble())).thenReturn(true);
+        when(validacion.esValida(contains("pel"), anyDouble())).thenReturn(true);
+        when(validacion.esValida(matches("[a-z]+"), anyDouble())).thenReturn(true);
+
+
+6. MATCHERS PERSONALIZADOS
+--------------------------
+
+argThat(lambda)
+    Condicion libre sobre un objeto.
+
+        verify(registro).registrar(argThat(factura -> factura.getImporte() < 600));
+
+intThat(lambda), doubleThat(lambda), longThat(lambda), booleanThat(lambda)...
+    Igual que argThat pero para tipos primitivos (evita NullPointerException
+    por el unboxing).
+
+        when(validacion.esValida(eq("informatica"), doubleThat(i -> i < 600)))
+                .thenReturn(true);
+
+
+7. ADDITIONALMATCHERS (comparaciones y logica)
+----------------------------------------------
+Estan en org.mockito.AdditionalMatchers.
+
+gt(x), geq(x), lt(x), leq(x)
+    Mayor, mayor o igual, menor, menor o igual.
+
+        when(validacion.esValida(eq("informatica"), lt(600.0))).thenReturn(true);
+        when(validacion.esValida(eq("informatica"), geq(600.0))).thenReturn(false);
+
+and(m1, m2), or(m1, m2), not(m)
+    Combinan otros matchers.
+
+        when(validacion.esValida(or(eq("marketing"), eq("papeleria")), anyDouble()))
+                .thenReturn(true);
+        when(validacion.esValida(not(eq("informatica")), anyDouble()))
+                .thenReturn(false);
+        when(validacion.esValida(anyString(), and(geq(0.0), lt(200.0))))
+                .thenReturn(true);
+
+aryEq(array)
+    Compara arrays por contenido.
+
+        // con un metodo como registrarIds(int[] ids)
+        verify(registro).registrarIds(aryEq(new int[] {1, 2, 3}));
+
+
+8. EXTRA: ARGUMENTCAPTOR
+------------------------
+No es un matcher, pero se usa en su lugar cuando queremos recuperar el
+argumento y hacer asserts normales sobre el.
+
+    ArgumentCaptor<Factura> captor = ArgumentCaptor.forClass(Factura.class);
+    verify(registro).registrar(captor.capture());
+    assertEquals("informatica", captor.getValue().getConcepto());
